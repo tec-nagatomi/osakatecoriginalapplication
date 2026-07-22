@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>電子印鑑作成</title>
+<style>
+* { box-sizing: border-box; }
+body {
+  margin: 0; padding: 20px;
+  font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif;
+  background: #f4f5f7; color: #222;
+}
+.wrap { max-width: 900px; margin: 0 auto; }
+h1 { font-size: 20px; margin: 0 0 16px; }
+.layout { display: flex; gap: 20px; flex-wrap: wrap; }
+.panel {
+  background: #fff; border: 1px solid #ddd; border-radius: 8px;
+  padding: 16px; flex: 1 1 380px;
+}
+.preview { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+label { display: block; font-size: 13px; margin: 12px 0 4px; font-weight: bold; }
+input[type="text"], select, input[type="number"] {
+  width: 100%; padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;
+}
+input[type="range"] { width: 100%; }
+.row { display: flex; gap: 10px; }
+.row > div { flex: 1; }
+canvas { background: #fff; border: 1px dashed #ccc; max-width: 100%; }
+button {
+  padding: 10px 16px; border: none; border-radius: 6px;
+  background: #c0392b; color: #fff; font-size: 14px; cursor: pointer;
+}
+button.sub { background: #555; }
+button:hover { opacity: .85; }
+.btns { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.val { font-size: 12px; color: #666; float: right; font-weight: normal; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>電子印鑑作成</h1>
+  <div class="layout">
+
+    <div class="panel">
+      <label>印鑑の種類</label>
+      <select id="type">
+        <option value="round">丸印（縦書き）</option>
+        <option value="round_h">丸印（横書き）</option>
+        <option value="date">日付印（三段）</option>
+        <option value="receipt">受領印（三段）</option>
+      </select>
+
+      <div id="textField">
+        <label>文字</label>
+        <select id="textPreset">
+          <option value="納">納</option>
+          <option value="納　絵理">納　絵理</option>
+          <option value="__custom__">自由入力</option>
+        </select>
+        <input type="text" id="text" value="納" maxlength="12" style="margin-top:6px;display:none">
+      </div>
+
+      <div id="dateFields" style="display:none">
+        <label>上段</label>
+        <input type="text" id="topText" value="大阪テック" maxlength="8">
+        <label>中段（日付）</label>
+        <input type="text" id="dateText" value="">
+        <label>下段</label>
+        <select id="btmPreset">
+          <option value="納">納</option>
+          <option value="納　絵理">納　絵理</option>
+          <option value="__custom__">自由入力</option>
+        </select>
+        <input type="text" id="btmText" value="納" maxlength="8" style="margin-top:6px;display:none">
+      </div>
+
+      <div id="receiptFields" style="display:none">
+        <label>上段</label>
+        <input type="text" id="rTop" value="受領" maxlength="8">
+        <label>中段</label>
+        <select id="rMidPreset">
+          <option value="納">納</option>
+          <option value="納　絵理">納　絵理</option>
+          <option value="__custom__">自由入力</option>
+        </select>
+        <input type="text" id="rMid" value="納" maxlength="8" style="margin-top:6px;display:none">
+        <label>下段（日付）</label>
+        <input type="text" id="rBtm" value="">
+      </div>
+
+      <label>フォント</label>
+      <select id="font">
+        <option value="serif">明朝体</option>
+        <option value="sans-serif">ゴシック体</option>
+        <option value='"Yu Mincho","MS Mincho",serif'>游明朝</option>
+      </select>
+
+      <label>色</label>
+      <div class="row">
+        <div><input type="color" id="color" value="#c0392b" style="width:100%;height:34px;border:1px solid #ccc;border-radius:4px"></div>
+        <div><select id="preset">
+          <option value="#c0392b">朱色</option>
+          <option value="#e60012">赤</option>
+          <option value="#1a3c8c">青</option>
+          <option value="#000000">黒</option>
+        </select></div>
+      </div>
+
+      <label>サイズ <span class="val" id="sizeVal">300px</span></label>
+      <input type="range" id="size" min="120" max="600" step="10" value="300">
+
+      <label>枠線の太さ <span class="val" id="borderVal">10</span></label>
+      <input type="range" id="border" min="2" max="30" value="10">
+
+      <label>文字サイズ調整 <span class="val" id="fsVal">100%</span></label>
+      <input type="range" id="fontScale" min="50" max="150" value="100">
+
+      <label>文字間隔 <span class="val" id="lsVal">0</span></label>
+      <input type="range" id="letterSpace" min="-20" max="40" value="0">
+
+      <label><input type="checkbox" id="transparent" checked style="width:auto"> 背景を透過（PNG）</label>
+      <label><input type="checkbox" id="aged" style="width:auto"> かすれ加工</label>
+
+      <div class="btns">
+        <button onclick="download('png')">PNG保存</button>
+        <button class="sub" onclick="download('jpeg')">JPEG保存</button>
+        <button class="sub" onclick="copyImg()">クリップボードにコピー</button>
+      </div>
+    </div>
+
+    <div class="panel preview">
+      <canvas id="cv" width="300" height="300"></canvas>
+      <div style="font-size:12px;color:#666" id="info"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const cv = $('cv'), ctx = cv.getContext('2d');
+
+function today(){
+  const d = new Date();
+  return d.getFullYear() + '.' + String(d.getMonth()+1).padStart(2,'0') + '.' + String(d.getDate()).padStart(2,'0');
+}
+$('dateText').value = today();
+$('rBtm').value = today();
+
+const ids = ['type','text','topText','btmText','dateText','rTop','rMid','rBtm',
+             'font','color','size','border','fontScale','letterSpace','transparent','aged'];
+ids.forEach(id => {
+  $(id).addEventListener('input', draw);
+  $(id).addEventListener('change', draw);
+});
+
+$('preset').addEventListener('change', e => { $('color').value = e.target.value; draw(); });
+
+// プルダウン → テキスト入力の連動（共通）
+function bindPreset(selectId, inputId){
+  $(selectId).addEventListener('change', e => {
+    if (e.target.value === '__custom__') {
+      $(inputId).style.display = 'block';
+      $(inputId).focus();
+    } else {
+      $(inputId).style.display = 'none';
+      $(inputId).value = e.target.value;
+    }
+    draw();
+  });
+}
+bindPreset('textPreset', 'text');
+bindPreset('btmPreset', 'btmText');
+bindPreset('rMidPreset', 'rMid');
+
+$('type').addEventListener('change', () => {
+  const t = $('type').value;
+  $('textField').style.display = (t === 'round' || t === 'round_h') ? 'block' : 'none';
+  $('dateFields').style.display = (t === 'date') ? 'block' : 'none';
+  $('receiptFields').style.display = (t === 'receipt') ? 'block' : 'none';
+  draw();
+});
+
+function draw(){
+  const type = $('type').value;
+  const size = +$('size').value;
+  const bw = +$('border').value * size / 300;
+  const color = $('color').value;
+  const font = $('font').value;
+  const fs = +$('fontScale').value / 100;
+  const ls = +$('letterSpace').value * size / 300;
+
+  $('sizeVal').textContent = size + 'px';
+  $('borderVal').textContent = $('border').value;
+  $('fsVal').textContent = $('fontScale').value + '%';
+  $('lsVal').textContent = $('letterSpace').value;
+
+  cv.width = cv.height = size;
+  ctx.clearRect(0,0,size,size);
+
+  if (!$('transparent').checked) {
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0,0,size,size);
+  }
+
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = bw;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  const c = size / 2;
+  const r = c - bw/2 - size*0.02;
+  ctx.beginPath(); ctx.arc(c, c, r, 0, Math.PI*2); ctx.stroke();
+
+  if (type === 'round') {
+    drawVertical($('text').value, c, size, r, font, fs, ls);
+  } else if (type === 'round_h') {
+    drawHorizontal($('text').value, c, size, r, font, fs, ls);
+  } else if (type === 'date') {
+    drawThreeRow([$('topText').value, $('dateText').value, $('btmText').value],
+                 c, r, bw, font, fs, [0.26, 0.30, 0.28]);
+  } else if (type === 'receipt') {
+    drawThreeRow([$('rTop').value, $('rMid').value, $('rBtm').value],
+                 c, r, bw, font, fs, [0.28, 0.34, 0.24]);
+  }
+
+  if ($('aged').checked) applyAged(size);
+  $('info').textContent = size + ' × ' + size + ' px';
+}
+
+function fitFont(text, maxW, base, font){
+  let s = base;
+  ctx.font = 'bold ' + s + 'px ' + font;
+  while (ctx.measureText(text).width > maxW && s > 6) {
+    s -= 1;
+    ctx.font = 'bold ' + s + 'px ' + font;
+  }
+  return s;
+}
+
+function drawThreeRow(texts, c, r, bw, font, fs, ratios){
+  const lw = bw * 0.6;
+  ctx.lineWidth = lw;
+  const y1 = c - r * 0.32, y2 = c + r * 0.32;
+  [y1, y2].forEach(y => {
+    const half = Math.sqrt(Math.max(r*r - (y-c)*(y-c), 0));
+    ctx.beginPath();
+    ctx.moveTo(c - half, y); ctx.lineTo(c + half, y); ctx.stroke();
+  });
+
+  const rows = [
+    [texts[0], c - r*0.6, r*1.2,  ratios[0]],
+    [texts[1], c,         r*1.55, ratios[1]],
+    [texts[2], c + r*0.6, r*1.2,  ratios[2]]
+  ];
+  rows.forEach(item => {
+    const t = item[0], y = item[1], maxW = item[2], ratio = item[3];
+    if (!t) return;
+    const s = fitFont(t, maxW, r * ratio * fs, font);
+    ctx.font = 'bold ' + s + 'px ' + font;
+    ctx.fillText(t, c, y);
+  });
+  ctx.lineWidth = bw;
+}
+
+function drawVertical(text, c, size, r, font, fs, ls){
+  const chars = [...text].filter(ch => ch.trim());
+  if (!chars.length) return;
+  const n = chars.length;
+  const area = r * 1.35;
+
+  if (n <= 4) {
+    const fsz = Math.min(area / n, area * 0.55) * fs;
+    ctx.font = 'bold ' + fsz + 'px ' + font;
+    const step = fsz + ls;
+    const total = step * n - ls;
+    let y = c - total/2 + step/2;
+    chars.forEach(ch => { ctx.fillText(ch, c, y); y += step; });
+  } else {
+    const colN = Math.ceil(n/2);
+    const right = chars.slice(0, colN);
+    const left = chars.slice(colN);
+    const fsz = Math.min(area / colN, area * 0.42) * fs;
+    ctx.font = 'bold ' + fsz + 'px ' + font;
+    const colX = fsz * 0.62;
+    [[right, c + colX], [left, c - colX]].forEach(pair => {
+      const col = pair[0], x = pair[1];
+      const step = fsz + ls;
+      const total = step * col.length - ls;
+      let y = c - total/2 + step/2;
+      col.forEach(ch => { ctx.fillText(ch, x, y); y += step; });
+    });
+  }
+}
+
+function drawHorizontal(text, c, size, r, font, fs, ls){
+  const chars = [...text].filter(ch => ch.trim());
+  if (!chars.length) return;
+  const maxW = r * 1.4;
+  const lines = chars.length <= 3 ? [chars]
+    : [chars.slice(0, Math.ceil(chars.length/2)), chars.slice(Math.ceil(chars.length/2))];
+  const base = maxW / Math.max(...lines.map(l => l.length)) * fs;
+  const fsz = Math.min(base, r * 0.8);
+  ctx.font = 'bold ' + fsz + 'px ' + font;
+  const lh = fsz * 1.1;
+  let y = c - (lines.length-1)*lh/2;
+  lines.forEach(line => {
+    drawSpaced(line.join(''), c, y, ls);
+    y += lh;
+  });
+}
+
+function drawSpaced(text, cx, y, ls){
+  if (!ls) { ctx.fillText(text, cx, y); return; }
+  const chars = [...text];
+  const widths = chars.map(ch => ctx.measureText(ch).width);
+  const total = widths.reduce((a,b)=>a+b,0) + ls*(chars.length-1);
+  let x = cx - total/2;
+  chars.forEach((ch,i) => {
+    ctx.fillText(ch, x + widths[i]/2, y);
+    x += widths[i] + ls;
+  });
+}
+
+function applyAged(size){
+  const img = ctx.getImageData(0,0,size,size);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i+3] > 0) {
+      const n = Math.random();
+      if (n < 0.14) d[i+3] = 0;
+      else if (n < 0.35) d[i+3] *= 0.55;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+function download(fmt){
+  const t = $('type').value;
+  let name = 'stamp';
+  if (t === 'round' || t === 'round_h') name = $('text').value || 'stamp';
+  else if (t === 'date') name = $('dateText').value || 'date';
+  else if (t === 'receipt') name = $('rTop').value || 'receipt';
+  name = name.replace(/[\\/:*?"<>|\s]/g, '_');
+
+  let src = cv;
+  if (fmt === 'jpeg') {
+    const tc = document.createElement('canvas');
+    tc.width = cv.width; tc.height = cv.height;
+    const g = tc.getContext('2d');
+    g.fillStyle = '#fff'; g.fillRect(0,0,tc.width,tc.height);
+    g.drawImage(cv,0,0);
+    src = tc;
+  }
+  const a = document.createElement('a');
+  a.download = 'inkan_' + name + '.' + (fmt === 'jpeg' ? 'jpg' : 'png');
+  a.href = src.toDataURL(fmt === 'jpeg' ? 'image/jpeg' : 'image/png', 0.95);
+  a.click();
+}
+
+async function copyImg(){
+  try {
+    const blob = await new Promise(res => cv.toBlob(res, 'image/png'));
+    await navigator.clipboard.write([new ClipboardItem({'image/png': blob})]);
+    alert('コピーしました');
+  } catch(e) {
+    alert('このブラウザではコピーに対応していません');
+  }
+}
+
+draw();
+</script>
+</body>
+</html>
